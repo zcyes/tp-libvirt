@@ -534,6 +534,48 @@ def test_umask(vm, params):
 
     gf.close_session()
 
+def test_xattr(vm, params):
+    """
+    Test xattr command
+    """
+    add_ref = params.get("gf_add_ref", "disk")
+    readonly = params.get("gf_add_readonly", "no")
+
+    gf = utils_test.libguestfs.GuestfishTools(params)
+    if add_ref == "disk":
+        image_path = params.get("image_path")
+        gf.add_drive_opts(image_path, readonly=readonly)
+    elif add_ref == "domain":
+        vm_name = params.get("main_vm")
+        gf.add_domain(vm_name, readonly=readonly)
+    gf.run()
+    mount_point = params.get("mount_point")
+    gf.mount(mount_point, '/')
+
+    gf.rm_rf("/file_ops")
+    gf.mkdir("/file_ops")
+    gf.touch("/file_ops/file_ascii")
+
+    gf.setxattr("user.name", "hahaha", "6", "/file_ops/file_ascii")
+    gf.setxattr("user.type", "'ascii file'", "10", "/file_ops/file_ascii")
+    gf_result = gf.getxattrs("/file_ops/file_ascii")
+    xattr_list = ["attrname: user.name", "attrval: hahaha", "attrname: user.type", "attrval: ascii file"]
+    
+    for xattr in xattr_list:
+        if xattr not in gf_result.stdout:
+            gf.close_session()
+            raise error.TestFail("xattr failed.")
+    gf_result = gf.getxattr("/file_ops/file_ascii", "user.name")
+    gf_result = gf.getxattr("/file_ops/file_ascii", "user.type")
+    gf.removexattr("user.name", "/file_ops/file_ascii")
+    gf.removexattr("user.type", "/file_ops/file_ascii")
+    gf_result = gf.getxattrs("/file_ops/file_ascii")
+    
+    for xattr in xattr_list:
+        if xattr in gf_result.stdout:
+            gf.close_session()
+            raise error.TestFail("xattr failed.")
+    gf.close_session()
 
 def test_cat(vm, params):
     """
